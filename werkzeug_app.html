@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETMA - Equipment Testing Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .sidebar { background-color: #f9fafb; }
+        .nav-link { display: flex; align-items: center; padding: 0.75rem 1.5rem; color: #4b5563; border-radius: 0.5rem; transition: background-color 0.2s, color 0.2s; cursor: pointer; }
+        .nav-link:hover { background-color: #e5e7eb; color: #1f2937; }
+        .nav-link.active { background-color: #e0e7ff; color: #3730a3; font-weight: 600; }
+        .nav-link i { margin-right: 0.75rem; width: 20px; text-align: center; }
+        .stat-card { background-color: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .equipment-card, .inspection-item, .calendar-item, .report-item, .settings-card { background-color: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .equipment-card { border-top: 4px solid transparent; }
+        .equipment-card.status-overdue { border-top-color: #ef4444; }
+        .equipment-card.status-due-soon { border-top-color: #f59e0b; }
+        .equipment-card.status-ok { border-top-color: #10b981; }
+        .status-tag { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .status-tag.status-overdue { background-color: #fee2e2; color: #b91c1c; }
+        .status-tag.status-due-soon { background-color: #fef3c7; color: #b45309; }
+        .status-tag.status-ok { background-color: #d1fae5; color: #047857; }
+        .status-tag.result-bestanden { background-color: #d1fae5; color: #047857;}
+        .status-tag.result-maengel { background-color: #fef3c7; color: #b45309;}
+        .status-tag.result-nicht-bestanden { background-color: #fee2e2; color: #b91c1c;}
+        .action-button { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; transition: background-color 0.2s; border: 1px solid #d1d5db; }
+        .action-button.primary { background-color: #2563eb; color: white; border-color: #2563eb; }
+        .action-button.primary:hover { background-color: #1d4ed8; }
+        .action-button.secondary { background-color: white; color: #374151; }
+        .action-button.secondary:hover { background-color: #f9fafb; }
+        .main-header-button { background-color: #374151; color: white; }
+        .main-header-button:hover { background-color: #1f2937; }
+        .modal { background-color: rgba(0, 0, 0, 0.5); }
+        .modal-content { max-height: 90vh; }
+        .page-content { display: none; }
+        .page-content.active { display: block; }
+        .table-auto th, .table-auto td { padding: 0.5rem 0.75rem; border: 1px solid #e5e7eb; text-align: left;}
+        /* File input styling */
+        input[type="file"] { display: none; }
+        .custom-file-upload { border: 1px solid #ccc; display: inline-block; padding: 6px 12px; cursor: pointer; background-color: #f9fafb; border-radius: 0.375rem; }
+        .custom-file-upload:hover { background-color: #e5e7eb; }
+    </style>
+</head>
+
+<body class="flex h-screen">
+
+    <aside class="sidebar w-64 p-6 border-r border-gray-200 flex flex-col justify-between">
+        <div>
+            <div class="text-2xl font-bold text-gray-800 mb-10">
+                ETMA <span class="text-blue-600">Π</span>
+                <p class="text-xs font-normal text-gray-500">Equipment Testing Management</p>
+            </div>
+            <nav class="space-y-2">
+                <a data-page="dashboard" class="nav-link active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a data-page="ausruestung" class="nav-link"><i class="fas fa-tools"></i> Ausrüstung</a>
+                <a data-page="inspektionen" class="nav-link"><i class="fas fa-clipboard-check"></i> Inspektionen</a>
+                <a data-page="kalender" class="nav-link"><i class="fas fa-calendar-alt"></i> Kalender</a>
+                <a data-page="berichte" class="nav-link"><i class="fas fa-chart-bar"></i> Berichte</a>
+            </nav>
+        </div>
+        <div class="mt-auto">
+             <a data-page="einstellungen" class="nav-link"><i class="fas fa-cog"></i> Einstellungen</a>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-8 overflow-y-auto">
+        <header class="flex justify-between items-center mb-8">
+            <h1 id="main-page-title" class="text-3xl font-bold text-gray-800">Dashboard</h1>
+            <button id="addEquipmentBtn" class="main-header-button action-button px-6 py-3 text-sm">
+                <i class="fas fa-plus mr-2"></i> Neue Ausrüstung
+            </button>
+        </header>
+
+        <div id="page-content-wrapper">
+            <div id="dashboard-content" class="page-content active">
+                <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="stat-card"><h2 class="text-sm font-medium text-gray-500">Gesamtanzahl</h2><p id="stat-total" class="text-4xl font-bold text-gray-800 mt-1">0</p><p class="text-xs text-gray-400 mt-1">Geräte insgesamt</p></div>
+                    <div class="stat-card"><h2 class="text-sm font-medium text-gray-500">Geprüft</h2><p id="stat-checked" class="text-4xl font-bold text-green-600 mt-1">0</p><p class="text-xs text-gray-400 mt-1">Aktuell geprüfte Geräte</p></div>
+                    <div class="stat-card"><h2 class="text-sm font-medium text-gray-500">Bald fällig</h2><p id="stat-due-soon" class="text-4xl font-bold text-yellow-500 mt-1">0</p><p class="text-xs text-gray-400 mt-1">Prüfungen in den nächsten 14 Tagen</p></div>
+                    <div class="stat-card"><h2 class="text-sm font-medium text-gray-500">Überfällig</h2><p id="stat-overdue" class="text-4xl font-bold text-red-600 mt-1">0</p><p class="text-xs text-gray-400 mt-1">Überfällige Prüfungen</p></div>
+                </section>
+                <section><h2 class="text-xl font-semibold text-gray-700 mb-4">Überfällige & bald fällige Prüfungen</h2><div id="dashboardEquipmentList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div></section>
+            </div>
+
+            <div id="ausruestung-content" class="page-content">
+                <section><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-700">Gesamte Ausrüstung</h2></div><div id="allEquipmentList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div></section>
+            </div>
+
+            <div id="inspektionen-content" class="page-content">
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-700">Alle Inspektionen</h2></div>
+                <div id="allInspectionsList" class="space-y-4"> </div>
+            </div>
+
+            <div id="kalender-content" class="page-content">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Anstehende Prüftermine</h2>
+                <div id="calendarViewList" class="space-y-4"></div>
+            </div>
+
+            <div id="berichte-content" class="page-content">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Gerätestatus Bericht</h2>
+                <div id="reportView" class="space-y-6"></div>
+            </div>
+
+            <div id="einstellungen-content" class="page-content">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Datenverwaltung & Einstellungen</h2>
+                
+                <div class="settings-card mb-6">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3">Datenspeicherung</h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Ihre Daten werden aktuell nur temporär im Browser gespeichert. Bei einem Neuladen der Seite oder Schließen des Browsers gehen die Daten verloren.
+                        Nutzen Sie die folgenden Optionen, um Ihre Daten manuell zu sichern und wiederherzustellen.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="settings-card">
+                        <h3 class="text-lg font-medium text-gray-800 mb-3">Datenexport</h3>
+                        <div class="space-y-3">
+                            <button id="saveCsvBtn" class="w-full action-button secondary flex items-center justify-center">
+                                <i class="fas fa-file-csv mr-2"></i> Als CSV speichern
+                            </button>
+                            <p class="text-xs text-gray-500">Exportiert alle Gerätedaten und deren Inspektionen in eine CSV-Datei, die mit Programmen wie Excel geöffnet werden kann.</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3 class="text-lg font-medium text-gray-800 mb-3">Backup</h3>
+                        <div class="space-y-3">
+                            <button id="saveBackupBtn" class="w-full action-button secondary flex items-center justify-center">
+                                <i class="fas fa-save mr-2"></i> Backup speichern (JSON)
+                            </button>
+                            <p class="text-xs text-gray-500 mb-3">Speichert den gesamten aktuellen Datenbestand der Anwendung in einer JSON-Datei. Dies ist die empfohlene Methode für ein vollständiges Backup.</p>
+                            
+                            <label for="loadBackupInput" class="custom-file-upload w-full action-button secondary flex items-center justify-center">
+                                <i class="fas fa-upload mr-2"></i> Backup laden (JSON)
+                            </label>
+                            <input type="file" id="loadBackupInput" accept=".json">
+                            <p class="text-xs text-gray-500">Lädt Daten aus einer zuvor gespeicherten JSON-Backup-Datei. Achtung: Aktuelle Daten werden überschrieben!</p>
+                        </div>
+                    </div>
+                </div>
+                 <div class="settings-card mt-6">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3">Hinweis zum Speicherort</h3>
+                    <p class="text-sm text-gray-600">
+                        Diese Anwendung bietet keine direkte Auswahl eines permanenten Speicherortes auf Ihrem Computer, da sie als reine Browser-Anwendung konzipiert ist.
+                        Die heruntergeladenen CSV- und JSON-Dateien werden in Ihrem Standard-Download-Ordner gespeichert, den Sie in Ihren Browser-Einstellungen festlegen können.
+                        Für eine robustere, automatische Speicherung wäre eine Server-Anbindung (Backend) oder die Nutzung von Browser-Datenbanken wie IndexedDB notwendig.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="equipmentModal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden overflow-y-auto">
+        <div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto my-8 overflow-y-auto">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-gray-800">Neue Ausrüstung hinzufügen</h2>
+            <form id="equipmentForm">
+                <input type="hidden" id="editIndex">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4"><div><label for="eqId" class="block text-sm font-medium text-gray-700 mb-1">ID/Inventarnummer*</label><input type="text" id="eqId" name="eqId" required class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div><div><label for="eqBezeichnung" class="block text-sm font-medium text-gray-700 mb-1">Bezeichnung*</label><input type="text" id="eqBezeichnung" name="eqBezeichnung" required class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4"><div><label for="eqKategorie" class="block text-sm font-medium text-gray-700 mb-1">Kategorie</label><input type="text" id="eqKategorie" name="eqKategorie" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div><div><label for="eqStandort" class="block text-sm font-medium text-gray-700 mb-1">Standort</label><input type="text" id="eqStandort" name="eqStandort" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4"><div><label for="eqLetztePruefung" class="block text-sm font-medium text-gray-700 mb-1">Letzte Prüfung</label><input type="date" id="eqLetztePruefung" name="eqLetztePruefung" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div><div><label for="eqNaechstePruefung" class="block text-sm font-medium text-gray-700 mb-1">Nächste Prüfung*</label><input type="date" id="eqNaechstePruefung" name="eqNaechstePruefung" required class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4"><div><label for="eqPruefintervall" class="block text-sm font-medium text-gray-700 mb-1">Prüfintervall</label><select id="eqPruefintervall" name="eqPruefintervall" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"><option value="Jährlich">Jährlich</option><option value="Halbjährlich">Halbjährlich</option><option value="Vierteljährlich">Vierteljährlich</option><option value="Monatlich">Monatlich</option><option value="Wöchentlich">Wöchentlich</option><option value="Täglich">Täglich</option><option value="2-Jährlich">2-Jährlich</option><option value="Benutzerdefiniert">Benutzerdefiniert</option></select></div><div><label for="eqVerantwortlicher" class="block text-sm font-medium text-gray-700 mb-1">Verantwortlich</label><input type="text" id="eqVerantwortlicher" name="eqVerantwortlicher" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div></div>
+                <div class="mb-4"><label for="eqNotizen" class="block text-sm font-medium text-gray-700 mb-1">Notizen</label><textarea id="eqNotizen" name="eqNotizen" rows="3" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea></div>
+                <div class="mb-6"><label for="eqFoto" class="block text-sm font-medium text-gray-700 mb-1">Foto URL (optional)</label><input type="url" id="eqFoto" name="eqFoto" placeholder="https://example.com/image.jpg" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div>
+                <div class="flex justify-end space-x-4"><button type="button" id="cancelModalBtn" class="action-button secondary">Abbrechen</button><button type="submit" class="action-button primary">Speichern</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="inspectionModal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden overflow-y-auto">
+        <div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto my-8">
+            <h2 id="inspectionModalTitle" class="text-2xl font-bold mb-6 text-gray-800">Inspektion hinzufügen</h2>
+            <form id="inspectionForm">
+                <input type="hidden" id="inspectionEquipmentIndex">
+                <div class="mb-4"><label for="inspEquipmentName" class="block text-sm font-medium text-gray-700 mb-1">Ausrüstung</label><input type="text" id="inspEquipmentName" name="inspEquipmentName" readonly class="w-full p-2 border border-gray-300 rounded-md bg-gray-100"></div>
+                <div class="mb-4"><label for="inspDate" class="block text-sm font-medium text-gray-700 mb-1">Inspektionsdatum*</label><input type="date" id="inspDate" name="inspDate" required class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div>
+                <div class="mb-4"><label for="inspInspector" class="block text-sm font-medium text-gray-700 mb-1">Prüfer*</label><input type="text" id="inspInspector" name="inspInspector" required class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></div>
+                <div class="mb-4"><label for="inspResult" class="block text-sm font-medium text-gray-700 mb-1">Ergebnis*</label><select id="inspResult" name="inspResult" required class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"><option value="Bestanden">Bestanden</option><option value="Bestanden mit Mängeln">Bestanden mit Mängeln</option><option value="Nicht bestanden">Nicht bestanden</option></select></div>
+                <div class="mb-6"><label for="inspNotes" class="block text-sm font-medium text-gray-700 mb-1">Notizen</label><textarea id="inspNotes" name="inspNotes" rows="3" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea></div>
+                <div class="flex justify-end space-x-4"><button type="button" id="cancelInspectionModalBtn" class="action-button secondary">Abbrechen</button><button type="submit" class="action-button primary">Inspektion Speichern</button></div>
+            </form>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM Elements ---
+        const addEquipmentBtn = document.getElementById('addEquipmentBtn');
+        const equipmentModal = document.getElementById('equipmentModal');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+        const equipmentForm = document.getElementById('equipmentForm');
+        const inspectionModal = document.getElementById('inspectionModal');
+        const inspectionForm = document.getElementById('inspectionForm');
+        const cancelInspectionModalBtn = document.getElementById('cancelInspectionModalBtn');
+        
+        const dashboardEquipmentListDiv = document.getElementById('dashboardEquipmentList');
+        const allEquipmentListDiv = document.getElementById('allEquipmentList');
+        const allInspectionsListDiv = document.getElementById('allInspectionsList');
+        const calendarViewListDiv = document.getElementById('calendarViewList');
+        const reportViewDiv = document.getElementById('reportView');
+
+        // Settings Page Elements
+        const saveCsvBtn = document.getElementById('saveCsvBtn');
+        const saveBackupBtn = document.getElementById('saveBackupBtn');
+        const loadBackupInput = document.getElementById('loadBackupInput');
+
+
+        const modalTitle = document.getElementById('modalTitle');
+        const editIndexInput = document.getElementById('editIndex');
+        const inspectionEquipmentIndexInput = document.getElementById('inspectionEquipmentIndex');
+        const inspEquipmentNameInput = document.getElementById('inspEquipmentName');
+
+
+        const statTotal = document.getElementById('stat-total');
+        const statChecked = document.getElementById('stat-checked');
+        const statDueSoon = document.getElementById('stat-due-soon');
+        const statOverdue = document.getElementById('stat-overdue');
+
+        const mainPageTitle = document.getElementById('main-page-title');
+
+        // --- Data Store ---
+        let equipmentData = [
+            { id: 'EQ-006', bezeichnung: 'Druckluftschlauch', modell: '50m', kategorie: 'Drucklufttechnik', standort: 'Haupthalle', letztePruefung: '2023-10-15', naechstePruefung: '2024-04-15', pruefintervall: 'Halbjährlich', verantwortlicher: 'Sandra Klein', notizen: 'Standardprüfung', foto: '', inspections: [{date: '2023-10-15', inspector: 'S. Klein', result: 'Bestanden', notes: 'Alles OK'}] },
+            { id: 'EQ-003', bezeichnung: 'Multimeter Fluke', modell: '87V', kategorie: 'Messgeräte', standort: 'Elektroabteilung', letztePruefung: '2023-11-20', naechstePruefung: '2024-05-20', pruefintervall: 'Halbjährlich', verantwortlicher: 'Klaus Weber', notizen: 'Kalibrierung OK', foto: '', inspections: [] },
+            { id: 'EQ-005', bezeichnung: 'Schweißgerät Miller', modell: 'XMT 350', kategorie: 'Schweißtechnik', standort: 'Schweißwerkstatt', letztePruefung: '2024-02-25', naechstePruefung: '2024-05-25', pruefintervall: 'Vierteljährlich', verantwortlicher: 'Markus Wolf', notizen: '', foto: '', inspections: [] },
+        ];
+
+        const PRUEFINERVALLE_TAGE = { "Täglich": 1, "Wöchentlich": 7, "Monatlich": 30, "Vierteljährlich": 90, "Halbjährlich": 180, "Jährlich": 365, "2-Jährlich": 730 };
+        const BALD_FAELLIG_TAGE_GRENZE = 14;
+
+        // --- Functions ---
+        function openEquipmentModal(editIndex = null) {
+            equipmentForm.reset();
+            editIndexInput.value = '';
+            if (editIndex !== null && equipmentData[editIndex]) {
+                const item = equipmentData[editIndex];
+                modalTitle.textContent = 'Ausrüstung bearbeiten';
+                Object.keys(item).forEach(key => {
+                    const inputId = `eq${key.charAt(0).toUpperCase() + key.slice(1)}`;
+                    const input = document.getElementById(inputId);
+                    if (input) {
+                         // Check if the field is a date and format accordingly
+                        if (input.type === 'date' && item[key]) {
+                            input.value = item[key]; // Already in YYYY-MM-DD
+                        } else {
+                            input.value = item[key] || (key === 'pruefintervall' ? 'Jährlich' : '');
+                        }
+                    }
+                });
+                 document.getElementById('eqId').value = item.id || ''; 
+                 document.getElementById('eqBezeichnung').value = item.bezeichnung || '';
+                editIndexInput.value = editIndex;
+            } else {
+                modalTitle.textContent = 'Neue Ausrüstung hinzufügen';
+                const heute = new Date();
+                document.getElementById('eqLetztePruefung').valueAsDate = new Date(heute);
+                const inEinemJahr = new Date(new Date(heute).setFullYear(heute.getFullYear() + 1));
+                document.getElementById('eqNaechstePruefung').valueAsDate = inEinemJahr;
+            }
+            equipmentModal.classList.remove('hidden');
+        }
+
+        function closeEquipmentModal() { equipmentModal.classList.add('hidden'); equipmentForm.reset(); }
+
+        function openInspectionModal(equipmentIndex) {
+            inspectionForm.reset();
+            const equipment = equipmentData[equipmentIndex];
+            if (!equipment) return;
+            document.getElementById('inspectionModalTitle').textContent = `Inspektion für ${equipment.bezeichnung} hinzufügen`;
+            inspEquipmentNameInput.value = `${equipment.bezeichnung} (ID: ${equipment.id})`;
+            inspectionEquipmentIndexInput.value = equipmentIndex;
+            document.getElementById('inspDate').valueAsDate = new Date(); 
+            inspectionModal.classList.remove('hidden');
+        }
+        function closeInspectionModal() { inspectionModal.classList.add('hidden'); inspectionForm.reset(); }
+
+
+        function getStatus(naechstePruefungDate) {
+            if (!naechstePruefungDate) return { text: 'Unbekannt', class: 'status-ok', tagClass: 'status-ok' };
+            const heute = new Date();
+            heute.setHours(0, 0, 0, 0);
+            const naechstePruefung = new Date(naechstePruefungDate);
+            naechstePruefung.setHours(0,0,0,0);
+            const diffTime = naechstePruefung - heute;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) return { text: 'Überfällig', class: 'status-overdue', tagClass: 'status-overdue' };
+            if (diffDays <= BALD_FAELLIG_TAGE_GRENZE) return { text: 'Bald fällig', class: 'status-due-soon', tagClass: 'status-due-soon' };
+            return { text: 'OK', class: 'status-ok', tagClass: 'status-ok' };
+        }
+        
+        function getInspectionResultClass(result) {
+            if (result === 'Bestanden') return 'result-bestanden';
+            if (result === 'Bestanden mit Mängeln') return 'result-maengel';
+            if (result === 'Nicht bestanden') return 'result-nicht-bestanden';
+            return '';
+        }
+
+        function createEquipmentCardHTML(item, index) {
+            const status = getStatus(item.naechstePruefung);
+            let inspectionsHTML = '<p class="text-xs text-gray-400 mt-2">Keine Inspektionen erfasst.</p>';
+            if(item.inspections && item.inspections.length > 0) {
+                inspectionsHTML = `<ul class="list-disc list-inside text-xs mt-1 max-h-20 overflow-y-auto">`;
+                item.inspections.slice(-3).reverse().forEach(insp => { 
+                    inspectionsHTML += `<li>${new Date(insp.date + 'T00:00:00').toLocaleDateString('de-DE')}: ${insp.result} (${insp.inspector})</li>`;
+                });
+                inspectionsHTML += `</ul>`;
+            }
+
+            return `
+                <div class="equipment-card ${status.class}">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-xs text-gray-500">ID: ${item.id}</p>
+                            <h3 class="text-lg font-semibold text-gray-800">${item.bezeichnung}</h3>
+                            <p class="text-sm text-gray-600">${item.modell || ''}</p>
+                        </div>
+                        <span class="status-tag ${status.tagClass}">${status.text}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4">
+                        <div><p class="text-gray-500">Kategorie</p><p class="text-gray-700 font-medium">${item.kategorie || '-'}</p></div>
+                        <div><p class="text-gray-500">Standort</p><p class="text-gray-700 font-medium">${item.standort || '-'}</p></div>
+                        <div><p class="text-gray-500">Letzte Prüfung</p><p class="text-gray-700 font-medium">${item.letztePruefung ? new Date(item.letztePruefung + 'T00:00:00').toLocaleDateString('de-DE') : '-'}</p></div>
+                        <div><p class="text-gray-500">Nächste Prüfung</p><p class="text-gray-700 font-medium">${item.naechstePruefung ? new Date(item.naechstePruefung + 'T00:00:00').toLocaleDateString('de-DE') : '-'}</p></div>
+                        <div><p class="text-gray-500">Prüfintervall</p><p class="text-gray-700 font-medium">${item.pruefintervall || '-'}</p></div>
+                        <div><p class="text-gray-500">Verantwortlich</p><p class="text-gray-700 font-medium">${item.verantwortlicher || '-'}</p></div>
+                    </div>
+                    ${item.foto ? `<img src="${item.foto}" alt="[Bild von ${item.bezeichnung}]" class="w-full h-32 object-cover rounded-md mb-4" onerror="this.onerror=null;this.src='https://placehold.co/300x200/f3f4f6/9ca3af?text=Bild+nicht+ladbar';">` : ''}
+                    <p class="text-xs text-gray-500 mb-1">Notizen (Gerät):</p>
+                    <p class="text-sm text-gray-600 mb-2 h-10 overflow-y-auto">${item.notizen || '-'}</p>
+                    <p class="text-xs text-gray-500 mb-1">Letzte Inspektionen:</p>
+                    ${inspectionsHTML}
+                    <div class="flex justify-end space-x-2 mt-4">
+                        <button class="action-button secondary text-xs add-inspection-btn" data-index="${index}"><i class="fas fa-plus-circle mr-1"></i> Inspektion</button>
+                        <button class="action-button secondary text-xs edit-btn" data-index="${index}"><i class="fas fa-edit mr-1"></i> Gerät Bearb.</button>
+                        <button class="action-button primary text-xs delete-btn" data-index="${index}"><i class="fas fa-trash-alt mr-1"></i> Löschen</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDashboardEquipmentList() {
+            dashboardEquipmentListDiv.innerHTML = '';
+            let displayedCount = 0;
+            equipmentData.forEach((item, index) => {
+                const status = getStatus(item.naechstePruefung);
+                if (status.text === 'Überfällig' || status.text === 'Bald fällig') {
+                    dashboardEquipmentListDiv.innerHTML += createEquipmentCardHTML(item, index);
+                    displayedCount++;
+                }
+            });
+            if (displayedCount === 0) dashboardEquipmentListDiv.innerHTML = '<p class="text-gray-500 col-span-full text-center">Keine überfälligen oder bald fälligen Prüfungen.</p>';
+            addCardEventListeners();
+        }
+
+        function renderAllEquipmentList() {
+            allEquipmentListDiv.innerHTML = '';
+            if (equipmentData.length === 0) allEquipmentListDiv.innerHTML = '<p class="text-gray-500 col-span-full text-center">Keine Ausrüstung vorhanden.</p>';
+            else equipmentData.forEach((item, index) => allEquipmentListDiv.innerHTML += createEquipmentCardHTML(item, index));
+            addCardEventListeners();
+        }
+
+        function renderAllInspectionsList() {
+            allInspectionsListDiv.innerHTML = '';
+            let inspectionsExist = false;
+            const allInspections = [];
+            equipmentData.forEach(equip => {
+                if (equip.inspections && equip.inspections.length > 0) {
+                    equip.inspections.forEach(insp => {
+                        allInspections.push({...insp, equipmentId: equip.id, equipmentBezeichnung: equip.bezeichnung });
+                    });
+                }
+            });
+
+            allInspections.sort((a,b) => new Date(b.date) - new Date(a.date)); // Sort by date, newest first
+
+            allInspections.forEach(insp => {
+                inspectionsExist = true;
+                const inspResultClass = getInspectionResultClass(insp.result);
+                allInspectionsListDiv.innerHTML += `
+                    <div class="inspection-item">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-semibold">${insp.equipmentBezeichnung} <span class="text-sm text-gray-500">(ID: ${insp.equipmentId})</span></h3>
+                            <span class="status-tag ${inspResultClass}">${insp.result}</span>
+                        </div>
+                        <p class="text-sm">Datum: <span class="font-medium">${new Date(insp.date + 'T00:00:00').toLocaleDateString('de-DE')}</span></p>
+                        <p class="text-sm">Prüfer: <span class="font-medium">${insp.inspector}</span></p>
+                        ${insp.notes ? `<p class="text-sm mt-1">Notizen: ${insp.notes}</p>` : ''}
+                    </div>
+                `;
+            });
+            if (!inspectionsExist) allInspectionsListDiv.innerHTML = '<p class="text-gray-500 text-center">Keine Inspektionen erfasst.</p>';
+        }
+
+        function renderCalendarView() {
+            calendarViewListDiv.innerHTML = '';
+            const sortedEquipment = [...equipmentData]
+                .filter(item => item.naechstePruefung) // Nur Geräte mit nächstem Prüfdatum
+                .sort((a, b) => new Date(a.naechstePruefung) - new Date(b.naechstePruefung));
+            
+            if (sortedEquipment.length === 0) {
+                 calendarViewListDiv.innerHTML = '<p class="text-gray-500 text-center">Keine anstehenden Prüftermine gefunden.</p>';
+                 return;
+            }
+
+            sortedEquipment.forEach(item => {
+                const status = getStatus(item.naechstePruefung);
+                calendarViewListDiv.innerHTML += `
+                    <div class="calendar-item border-l-4 ${status.class === 'status-ok' ? 'border-green-500' : (status.class === 'status-due-soon' ? 'border-yellow-500' : 'border-red-500')}">
+                        <p class="font-semibold">${new Date(item.naechstePruefung + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        <p class="text-sm">${item.bezeichnung} (ID: ${item.id}) - Status: <span class="font-medium ${status.tagClass} px-1 rounded">${status.text}</span></p>
+                        <p class="text-xs text-gray-500">Kategorie: ${item.kategorie || '-'}, Standort: ${item.standort || '-'}</p>
+                    </div>
+                `;
+            });
+        }
+
+        function renderReportView() {
+            reportViewDiv.innerHTML = '';
+            const statusGroups = { overdue: [], dueSoon: [], ok: [], unknown: [] };
+            equipmentData.forEach(item => {
+                const statusText = getStatus(item.naechstePruefung).text; // Corrected: get text from status object
+                if (statusText === 'Überfällig') statusGroups.overdue.push(item);
+                else if (statusText === 'Bald fällig') statusGroups.dueSoon.push(item);
+                else if (statusText === 'OK') statusGroups.ok.push(item);
+                else statusGroups.unknown.push(item);
+            });
+
+            let reportHTML = '';
+            function createReportSection(title, items, colorClass) {
+                let sectionHTML = `<div class="mb-6"><h3 class="text-lg font-semibold text-${colorClass}-600 mb-2">${title} (${items.length})</h3>`;
+                if (items.length > 0) {
+                    sectionHTML += '<ul class="list-disc list-inside space-y-1">';
+                    items.forEach(item => {
+                        sectionHTML += `<li>${item.bezeichnung} (ID: ${item.id}) - Nächste Prüfung: ${item.naechstePruefung ? new Date(item.naechstePruefung + 'T00:00:00').toLocaleDateString('de-DE') : 'Unbekannt'}</li>`;
+                    });
+                    sectionHTML += '</ul>';
+                } else {
+                    sectionHTML += '<p class="text-sm text-gray-500">Keine Geräte in dieser Kategorie.</p>';
+                }
+                sectionHTML += '</div>';
+                return sectionHTML;
+            }
+            reportHTML += createReportSection('Überfällige Geräte', statusGroups.overdue, 'red');
+            reportHTML += createReportSection('Bald fällige Geräte', statusGroups.dueSoon, 'yellow');
+            reportHTML += createReportSection('Geprüfte Geräte (OK)', statusGroups.ok, 'green');
+            if(statusGroups.unknown.length > 0) reportHTML += createReportSection('Geräte mit unbekanntem Prüfstatus', statusGroups.unknown, 'gray');
+            
+            reportViewDiv.innerHTML = reportHTML || '<p class="text-gray-500 text-center">Keine Daten für Berichte verfügbar.</p>';
+        }
+        
+        function addCardEventListeners() {
+            document.querySelectorAll('.edit-btn').forEach(b => { b.removeEventListener('click', handleEditClick); b.addEventListener('click', handleEditClick); });
+            document.querySelectorAll('.delete-btn').forEach(b => { b.removeEventListener('click', handleDeleteClick); b.addEventListener('click', handleDeleteClick); });
+            document.querySelectorAll('.add-inspection-btn').forEach(b => { b.removeEventListener('click', handleAddInspectionClick); b.addEventListener('click', handleAddInspectionClick); });
+        }
+        function handleEditClick() { openEquipmentModal(this.dataset.index); }
+        function handleDeleteClick() { deleteEquipment(this.dataset.index); }
+        function handleAddInspectionClick() { openInspectionModal(this.dataset.index); }
+
+
+        function deleteEquipment(index) {
+            if (confirm(`Möchten Sie "${equipmentData[index].bezeichnung}" wirklich löschen?`)) {
+                equipmentData.splice(index, 1);
+                const activePage = document.querySelector('.nav-link.active').dataset.page;
+                if (activePage === 'dashboard') renderDashboardEquipmentList();
+                if (activePage === 'ausruestung') renderAllEquipmentList();
+                if (activePage === 'inspektionen') renderAllInspectionsList();
+                if (activePage === 'kalender') renderCalendarView();
+                if (activePage === 'berichte') renderReportView();
+                updateStatCards();
+            }
+        }
+
+        function updateStatCards() {
+            statTotal.textContent = equipmentData.length;
+            let checkedCount = 0, dueSoonCount = 0, overdueCount = 0;
+            equipmentData.forEach(item => {
+                const status = getStatus(item.naechstePruefung);
+                if (status.text === 'OK') checkedCount++;
+                else if (status.text === 'Bald fällig') dueSoonCount++;
+                else if (status.text === 'Überfällig') overdueCount++;
+            });
+            statChecked.textContent = checkedCount;
+            statDueSoon.textContent = dueSoonCount;
+            statOverdue.textContent = overdueCount;
+        }
+        
+        function updateNaechstePruefungVorschlag() {
+            const letztePruefungInput = document.getElementById('eqLetztePruefung');
+            const naechstePruefungInput = document.getElementById('eqNaechstePruefung');
+            const intervallSelect = document.getElementById('eqPruefintervall');
+
+            if (letztePruefungInput.value && intervallSelect.value !== "Benutzerdefiniert") {
+                const letzteDatum = new Date(letztePruefungInput.value);
+                if (isNaN(letzteDatum.getTime())) return;
+                const tage = PRUEFINERVALLE_TAGE[intervallSelect.value];
+                if (tage) {
+                    const naechsteDatum = new Date(letzteDatum.valueOf()); 
+                    naechsteDatum.setDate(naechsteDatum.getDate() + tage);
+                    naechstePruefungInput.valueAsDate = naechsteDatum;
+                }
+            }
+        }
+
+        // --- Data Export/Import Functions ---
+        function downloadFile(content, fileName, contentType) {
+            const a = document.createElement("a");
+            const file = new Blob([content], { type: contentType });
+            a.href = URL.createObjectURL(file);
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function saveToCsv() {
+            let csvContent = "Geräte ID;Bezeichnung;Modell;Kategorie;Standort;Letzte Prüfung;Nächste Prüfung;Prüfintervall;Verantwortlicher;Notizen (Gerät);Foto URL;Inspektion Datum;Inspektion Prüfer;Inspektion Ergebnis;Inspektion Notizen\n";
+            
+            equipmentData.forEach(item => {
+                const itemBase = [
+                    item.id || '', item.bezeichnung || '', item.modell || '', item.kategorie || '', item.standort || '',
+                    item.letztePruefung || '', item.naechstePruefung || '', item.pruefintervall || '',
+                    item.verantwortlicher || '', (item.notizen || '').replace(/"/g, '""'), item.foto || ''
+                ].map(field => `"${field}"`).join(";");
+
+                if (item.inspections && item.inspections.length > 0) {
+                    item.inspections.forEach(insp => {
+                        const inspData = [
+                            insp.date || '', insp.inspector || '', insp.result || '', (insp.notes || '').replace(/"/g, '""')
+                        ].map(field => `"${field}"`).join(";");
+                        csvContent += itemBase + ";" + inspData + "\n";
+                    });
+                } else {
+                    csvContent += itemBase + ";;;;\n"; // Empty inspection fields
+                }
+            });
+            downloadFile(csvContent, 'etma_export.csv', 'text/csv;charset=utf-8;');
+            alert("Daten als CSV exportiert!");
+        }
+
+        function saveToJsonBackup() {
+            const jsonData = JSON.stringify(equipmentData, null, 2); // Pretty print JSON
+            downloadFile(jsonData, `etma_backup_${new Date().toISOString().split('T')[0]}.json`, 'application/json;charset=utf-8;');
+            alert("Backup als JSON gespeichert!");
+        }
+
+        function loadFromJsonBackup(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const loadedData = JSON.parse(e.target.result);
+                        if (Array.isArray(loadedData)) { // Basic validation
+                            if (confirm("Möchten Sie wirklich das Backup laden? Alle aktuellen, nicht gespeicherten Daten gehen verloren!")) {
+                                equipmentData = loadedData;
+                                // Re-render all relevant views
+                                const activePage = document.querySelector('.nav-link.active').dataset.page;
+                                navigateToPage(activePage, true); // Force re-render of current page
+                                updateStatCards();
+                                alert("Backup erfolgreich geladen!");
+                            }
+                        } else {
+                            alert("Fehler: Die Datei scheint kein gültiges Backup-Format zu haben.");
+                        }
+                    } catch (error) {
+                        console.error("Error parsing JSON backup:", error);
+                        alert("Fehler beim Laden des Backups: " + error.message);
+                    } finally {
+                        loadBackupInput.value = ""; // Reset file input
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+
+        // --- Event Listeners ---
+        addEquipmentBtn.addEventListener('click', () => openEquipmentModal());
+        cancelModalBtn.addEventListener('click', closeEquipmentModal);
+        cancelInspectionModalBtn.addEventListener('click', closeInspectionModal);
+
+        window.addEventListener('keydown', (event) => { 
+            if (event.key === 'Escape') {
+                if (!equipmentModal.classList.contains('hidden')) closeEquipmentModal();
+                if (!inspectionModal.classList.contains('hidden')) closeInspectionModal();
+            }
+        });
+        equipmentModal.addEventListener('click', (event) => { if (event.target === equipmentModal) closeEquipmentModal(); });
+        inspectionModal.addEventListener('click', (event) => { if (event.target === inspectionModal) closeInspectionModal(); });
+
+
+        equipmentForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const item = {
+                id: formData.get('eqId'),
+                bezeichnung: formData.get('eqBezeichnung'),
+                kategorie: formData.get('eqKategorie'),
+                standort: formData.get('eqStandort'),
+                letztePruefung: formData.get('eqLetztePruefung'),
+                naechstePruefung: formData.get('eqNaechstePruefung'),
+                pruefintervall: formData.get('eqPruefintervall'),
+                verantwortlicher: formData.get('eqVerantwortlicher'),
+                notizen: formData.get('eqNotizen'),
+                foto: formData.get('eqFoto'),
+                modell: formData.get('eqModell') || '', // Ensure modell is captured if added to form
+                inspections: [] 
+            };
+
+            const editIdx = editIndexInput.value;
+            if (editIdx !== '') { 
+                item.inspections = equipmentData[editIdx].inspections || []; 
+                equipmentData[editIdx] = item; 
+            } else { 
+                equipmentData.push(item); 
+            }
+            
+            const activePage = document.querySelector('.nav-link.active').dataset.page;
+            if (activePage === 'dashboard') renderDashboardEquipmentList();
+            if (activePage === 'ausruestung') renderAllEquipmentList();
+            
+            updateStatCards();
+            closeEquipmentModal();
+        });
+
+        inspectionForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const equipmentIdx = inspectionEquipmentIndexInput.value;
+            if (equipmentIdx === '' || !equipmentData[equipmentIdx]) return;
+
+            const formData = new FormData(this);
+            const newInspection = {
+                date: formData.get('inspDate'),
+                inspector: formData.get('inspInspector'),
+                result: formData.get('inspResult'),
+                notes: formData.get('inspNotes')
+            };
+            if (!equipmentData[equipmentIdx].inspections) {
+                equipmentData[equipmentIdx].inspections = [];
+            }
+            equipmentData[equipmentIdx].inspections.push(newInspection);
+            
+            if (newInspection.result === 'Bestanden') {
+                const equipmentItem = equipmentData[equipmentIdx];
+                const inspectionDate = new Date(newInspection.date);
+                const lastCheckDate = equipmentItem.letztePruefung ? new Date(equipmentItem.letztePruefung) : null;
+
+                if (!lastCheckDate || inspectionDate > lastCheckDate) {
+                    equipmentItem.letztePruefung = newInspection.date;
+                    if (equipmentItem.pruefintervall !== "Benutzerdefiniert" && PRUEFINERVALLE_TAGE[equipmentItem.pruefintervall]) {
+                        const tage = PRUEFINERVALLE_TAGE[equipmentItem.pruefintervall];
+                        const naechsteDatum = new Date(inspectionDate.valueOf());
+                        naechsteDatum.setDate(naechsteDatum.getDate() + tage);
+                        equipmentItem.naechstePruefung = naechsteDatum.toISOString().split('T')[0];
+                    }
+                }
+            }
+
+            const activePage = document.querySelector('.nav-link.active').dataset.page;
+            if (activePage === 'dashboard') renderDashboardEquipmentList();
+            if (activePage === 'ausruestung') renderAllEquipmentList();
+            if (activePage === 'inspektionen') renderAllInspectionsList(); 
+            
+            updateStatCards();
+            closeInspectionModal();
+        });
+        
+        document.getElementById('eqLetztePruefung').addEventListener('change', updateNaechstePruefungVorschlag);
+        document.getElementById('eqPruefintervall').addEventListener('change', updateNaechstePruefungVorschlag);
+
+        // Settings Page Event Listeners
+        if(saveCsvBtn) saveCsvBtn.addEventListener('click', saveToCsv);
+        if(saveBackupBtn) saveBackupBtn.addEventListener('click', saveToJsonBackup);
+        if(loadBackupInput) loadBackupInput.addEventListener('change', loadFromJsonBackup);
+
+
+        // Navigation Logic
+        function navigateToPage(page, forceRender = false) {
+            const navLinkElement = document.querySelector(`.nav-link[data-page="${page}"]`);
+            if (!navLinkElement) return;
+
+            mainPageTitle.textContent = navLinkElement.innerText.trim();
+
+            document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
+            navLinkElement.classList.add('active');
+
+            document.querySelectorAll('.page-content').forEach(pc => pc.classList.remove('active'));
+            const targetPageContent = document.getElementById(`${page}-content`);
+            if (targetPageContent) targetPageContent.classList.add('active');
+
+            addEquipmentBtn.classList.add('hidden'); 
+
+            if (page === 'dashboard' || forceRender) {
+                addEquipmentBtn.classList.remove('hidden');
+                renderDashboardEquipmentList();
+                updateStatCards();
+            } else if (page === 'ausruestung' || forceRender) {
+                addEquipmentBtn.classList.remove('hidden');
+                renderAllEquipmentList();
+            } else if (page === 'inspektionen' || forceRender) {
+                renderAllInspectionsList();
+            } else if (page === 'kalender' || forceRender) {
+                renderCalendarView();
+            } else if (page === 'berichte' || forceRender) {
+                renderReportView();
+            } else if (page === 'einstellungen') {
+                // Settings page content is static HTML, no specific render function needed unless dynamic elements are added.
+            }
+        }
+
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.addEventListener('click', function(event) {
+                event.preventDefault(); 
+                const page = this.dataset.page;
+                navigateToPage(page);
+            });
+        });
+
+        // --- Initial Load ---
+        navigateToPage('dashboard', true); // Load dashboard on startup
+        console.log("Web App initialisiert mit erweiterten Einstellungsfunktionen.");
+
+    </script>
+</body>
+</html>
